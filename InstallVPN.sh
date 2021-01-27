@@ -47,7 +47,11 @@ read -p 'NordVpn username: ' uservar
 read -p 'NordVpn password: ' passvar
 
 echo "Getting VPN configurations..."
-unzip -o openvpn.zip -d /home/pi/vpn
+wget https://downloads.nordcdn.com/configs/archives/servers/ovpn.zip
+unzip -o ovpn.zip -d /home/pi/vpn
+rm /home/pi/vpn/ovpn.zip
+cp /home/pi/vpn/ovpn_udp/*.ovpn /home/pi/vpn/.
+rm -rf /home/pi/vpn/ovpn_tcp /home/pi/vpn/ovpn_udp # Only using the UDP connections here, so removing the TCP folder
 
 #Setup VPN configuration file
 chown -R pi:pi /home/pi/vpn
@@ -59,8 +63,6 @@ echo "
  [228]=US
 "
 PS3='Select a number: '
-maxtries=5
-t="0"
 read -p "$PS3" vpncode
 
 vpnregion=$( python3 gateway-selector.py "$vpncode")
@@ -69,12 +71,7 @@ cp swap_endpoint.sh /home/pi/
 chown pi:pi /home/pi/swap_endpoint.sh
 chmod 755 /home/pi/swap_endpoint.sh
 
-if [ "$STRONG" -eq 0 ]; then
-	cp /home/pi/vpn/ca.rsa.2048.crt /home/pi/vpn/crl.rsa.2048.pem /etc/openvpn/
-else
-	cp /home/pi/vpn/ca.rsa.4096.crt /home/pi/vpn/crl.rsa.4096.pem /etc/openvpn/
-fi
-cp "$vpnregion" /etc/openvpn/vpn.conf
+cp /home/pi/vpn/"$vpnregion" /etc/openvpn/vpn.conf
 
 #Modify configuration
 sed -i 's/auth-user-pass/auth-user-pass \/etc\/openvpn\/login/' /etc/openvpn/vpn.conf
@@ -87,7 +84,6 @@ rm /etc/openvpn/login
 echo -e "${uservar}\n${passvar}" | tee -a /etc/openvpn/login
 chmod 600 /etc/openvpn/login
 
-clear
 echo "
 ~~~~~~~~~~~~~~~~~~~~~
 Now OpenVPN needs to update, this will take a while.
