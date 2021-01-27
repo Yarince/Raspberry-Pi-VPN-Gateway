@@ -1,0 +1,24 @@
+SET DAEMON 10
+        WITH START DELAY 60
+
+check process OpenVPN matching "openvpn"
+        start program = "/bin/systemctl start openvpn@vpn"
+        stop  program = "/bin/systemctl stop openvpn"
+
+check network tun0 with interface tun0
+        if failed link for 3 cycles then exec '/home/pi/vpnfix.sh'
+
+check network restartOpenVPN with interface tun0
+        if failed link then exec "/bin/systemctl reload-or-restart openvpn@vpn"
+
+check host google.com with address google.com
+        if failed port 443 protocol https for 3 cycles then exec '/home/pi/vpnfix.sh'
+
+check file vpnfix.log with path /home/pi/vpnfix.log
+        start  "/bin/bash -c 'touch /home/pi/vpnfix.log && chown pi:pi /home/pi/vpnfix.log && chmod 666 /home/pi/vpnfix.log'"
+        if size > 1000 MB then exec "/bin/rm /home/pi/vpnfix.log"
+
+set httpd port 2812 and
+ use address localhost
+ allow localhost
+ allow admin:monit
