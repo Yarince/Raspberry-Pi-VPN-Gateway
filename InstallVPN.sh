@@ -46,38 +46,24 @@ read -n 1 -s
 read -p 'NordVpn username: ' uservar
 read -p 'NordVpn password: ' passvar
 
-STRONG=0
-echo "
-Do you wish to use the strongest encryption instead of the default? This will result in slower performance."
-select yn in "Yes" "No"; do
-    case $yn in
-        Yes)
-		STRONG=1
-		echo "Getting VPN configurations..."
-		wget -q https://www.privateinternetaccess.com/openvpn/openvpn-strong.zip -O openvpn.zip
-		break;;
-        No) 
-		echo "Getting VPN configurations..."
-		wget -q https://www.privateinternetaccess.com/openvpn/openvpn.zip -O openvpn.zip
-		break;;
-    esac
-done
+echo "Getting VPN configurations..."
 unzip -o openvpn.zip -d /home/pi/vpn
 
 #Setup VPN configuration file
 chown -R pi:pi /home/pi/vpn
-files=$(find /home/pi/vpn/ -maxdepth 1 -type f -regex ".*ovpn")
-readarray -t options <<<"$files"
-clear
+
 echo "Please select an endpoint to connect to:"
+echo "
+ [153]=Netherlands
+ [227]=UK
+ [228]=US
+"
 PS3='Select a number: '
-select vpnregion in "${options[@]}" ; do
-    if (( REPLY > 0 && REPLY <= ${#options[@]} )) ; then
-        break
-    else
-	echo "Invalid option. Try another one."
-    fi
-done
+maxtries=5
+t="0"
+read -p "$PS3" vpncode
+
+vpnregion=$( python3 gateway-selector.py "$vpncode")
 
 cp swap_endpoint.sh /home/pi/
 chown pi:pi /home/pi/swap_endpoint.sh
@@ -92,13 +78,7 @@ cp "$vpnregion" /etc/openvpn/vpn.conf
 
 #Modify configuration
 sed -i 's/auth-user-pass/auth-user-pass \/etc\/openvpn\/login/' /etc/openvpn/vpn.conf
-if [ "$STRONG" -eq 0 ]; then
-	sed -i 's/ca ca.rsa.2048.crt/ca \/etc\/openvpn\/ca.rsa.2048.crt/' /etc/openvpn/vpn.conf
-	sed -i 's/crl-verify crl.rsa.2048.pem/crl-verify \/etc\/openvpn\/crl.rsa.2048.pem/' /etc/openvpn/vpn.conf
-else
-	sed -i 's/ca ca.rsa.4096.crt/ca \/etc\/openvpn\/ca.rsa.4096.crt/' /etc/openvpn/vpn.conf
-	sed -i 's/crl-verify crl.rsa.4096.pem/crl-verify \/etc\/openvpn\/crl.rsa.4096.pem/' /etc/openvpn/vpn.conf
-fi
+
 echo "auth-nocache" | tee -a /etc/openvpn/vpn.conf
 echo -e "script-security 2\nup /etc/openvpn/update-resolv-conf\ndown /etc/openvpn/update-resolv-conf" | tee -a /etc/openvpn/vpn.conf
 
